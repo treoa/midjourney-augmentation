@@ -2,14 +2,12 @@ import os
 import time
 import requests
 
-from globals import headers, discord_interaction_url
-
-def GetResponse(json : dict) -> bool:
+def GetResponse(url: str, json : dict, headers: dict) -> bool:
     """
         Send the post request and get the response, after validating it.
     """
     try:
-        response = requests.post(url = discord_interaction_url, json = json, headers = headers)
+        response = requests.post(url = url, json = json, headers = headers)
         print(f"Getting the response: {response.content}")
         return _ResponseCheck(response)
     except Exception as e:
