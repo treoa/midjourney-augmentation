@@ -10,7 +10,7 @@ from typing import List
 from globals import GlobalConfigs
 from helpers import GetResponse, _ResponseCheck
 
-class DescribeConfigs(GlobalConfigs):
+class DescribeService(GlobalConfigs):
     """
         TODO:
         - Initiate the describe url method to get the values 
@@ -69,7 +69,7 @@ class DescribeConfigs(GlobalConfigs):
         }
         return __payload
 
-class ImagineConfigs(GlobalConfigs):
+class ImagineService(GlobalConfigs):
     def __init__(self, 
                  server_id: str = None, 
                  discord_token: str = None, 
@@ -81,18 +81,16 @@ class ImagineConfigs(GlobalConfigs):
                  imagine_url: str = None) -> None:
         super().__init__(server_id, discord_token, channel_id, cookie, storage_url, messages_url, interaction_url)
         self.imagine_url = imagine_url if imagine_url else f"https://discord.com/api/v10/channels/{self.channel_id}/application-commands/search?type=1&include_applications=true&query=imagine"
-        print(self.channel_id)
         self.updated_json = json.loads(requests.request(
             "GET",
             self.imagine_url,
             headers=self.headers,
             data= {},
         ).text)
-        pprint.pprint(self.updated_json)
+        # pprint.pprint(self.updated_json)s
         self.midjourney_id = self.updated_json["application_commands"][0]["application_id"] # application_id that midjourney was given by Discord
         self.imagine_id = self.updated_json["application_commands"][0]["id"]
         self.version = self.updated_json["application_commands"][0]["version"]
-        print(self.midjourney_id, self.imagine_id, self.version)
     
     def get_payload(self, prompt: str) -> dict:
         imagine_json = {
@@ -145,11 +143,58 @@ class ImagineConfigs(GlobalConfigs):
         }
 
         return imagine_json
+    
+    def get_last_message(self) -> dict:
+        messages = json.loads(
+            requests.request(
+                "GET",
+                url=self.messages_url,
+                headers=self.headers,
+                data={},
+            ).text
+        )
+        pprint.pprint(messages[0]["id"])
+        return messages[0]
+    
+    def get_option_from_generated(self, idx: int) -> bool:
+        last_msg = self.get_last_message()
+        generated_msg_payload = {
+            "type": 3,
+            "guild_id": self.server_id,
+            "application_id": self.midjourney_id,
+            "session_id": random.randint(0, 8888),
+            "channel_id": self.channel_id,
+            "message_id": last_msg["id"],
+            "data": {
+                "component_type": 2,
+                "custom_id": last_msg["components"][0]["components"][idx]["custom_id"]
+            },}
+        
 
 # midjourney_id = "936929561302675456"
 
 if __name__ == "__main__":
-    a = ImagineConfigs()
+    a = ImagineService()
     imagine_json = a.get_payload(prompt="Will Smith")
-    response = GetResponse(url=a.interaction_url, json=imagine_json, headers=a.headers)
-    print(response)
+    # response = GetResponse(url=a.interaction_url, json=imagine_json, headers=a.headers)
+    last_msg = a.get_last_message()
+    # pprint.pprint(last_msg)
+    
+    # response = requests.request(
+    #     "POST",
+    #     url=a.interaction_url,
+    #     json=msg_payload,
+    #     headers=a.headers,
+    # )
+    
+    # pprint.pprint(last_msg)
+    # url = 'https://cdn.discordapp.com/attachments/1071628299194875937/1173850757976559697/toneest_Will_Smith_eb690c40-6c4c-4058-9394-bc9ad720554d.png?ex=656574b5&is=6552ffb5&hm=16b9a6c31edb049a27cf455655d6a83c28f25a652118b21580073671aa22ff19&'
+    # filename = 'image11.jpg'
+
+    # response = requests.get(url)
+    # if response.status_code == 200:
+    #     with open(filename, 'wb') as file:
+    #         file.write(response.content)
+
+    # print(f'Image saved as {filename}')
+
