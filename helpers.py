@@ -8,7 +8,8 @@ def GetResponse(url: str, json : dict, headers: dict) -> bool:
     """
     try:
         response = requests.post(url = url, json = json, headers = headers)
-        print(f"Getting the response: {response.content}")
+        print("The request has been sent and response got.")
+        # print(f"Getting the response: {response.text}")
         return _ResponseCheck(response)
     except Exception as e:
         return (False, "ResponseError in Location:{}, Msg:{}".format("GetResponse", e))
