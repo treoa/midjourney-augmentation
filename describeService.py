@@ -3,9 +3,7 @@ import re
 import time
 import json
 import uuid
-import pprint
 import random
-import asyncio
 import requests
 
 from typing import List
@@ -32,11 +30,9 @@ class DescribeService(GlobalConfigs):
             headers=self.headers,
             data= {},
         ).text)
-        # pprint.pprint(self.updated_json)
         self.midjourney_id = self.updated_json["application_commands"][0]["application_id"] # application_id that midjourney was given by Discord
         self.describe_id = self.updated_json["application_commands"][0]["id"]
         self.version = self.updated_json["application_commands"][0]["version"]
-        # print(self.midjourney_id, self.describe_id, self.version)
         self.describe_json = {
             "session_id": random.randint(0, 8888),
             "version": self.version,
@@ -75,7 +71,6 @@ class DescribeService(GlobalConfigs):
                 data={},
             ).text
         )
-        # pprint.pprint(messages[0]["id"])
         return messages[0]
     
     def JsonRegImg(self, filename : str, filesize : int) -> dict:
@@ -85,7 +80,7 @@ class DescribeService(GlobalConfigs):
     def ImageStorage(self, ImageName : str, ImageUrl : str, ImageSize : int) -> tuple:
         try:
             ImageName = ImageName.split(".")
-            ImageName = "{}.{}".format(ImageName[0], ImageName[1])
+            ImageName = "{}_{}".format(ImageName[0], ImageName[1])
 
             _response = requests.post(url = self.storage_url, json = self.JsonRegImg(ImageName, ImageSize), headers = self.headers)
             if _ResponseCheck(_response)[0]:
@@ -95,9 +90,12 @@ class DescribeService(GlobalConfigs):
 
                 __response = requests.get(ImageUrl, headers={"authority":"cdn.discordapp.com"})
                 if _ResponseCheck(__response)[0]:
-                        
+                    if ImageUrl != "https://example.com":
+                        my_data = __response.content
+                    else:
+                        my_data = open(ImageName, "rb")
                     # ___response = requests.put(upload_url,data=__response.content, headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
-                    ___response = requests.put(upload_url, data=open(ImageName, "rb"), headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
+                    ___response = requests.put(upload_url, data=my_data, headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
                     if _ResponseCheck(___response)[0]:
                         return (True, (ImageName, upload_filename))
                     else:
@@ -118,35 +116,25 @@ class DescribeService(GlobalConfigs):
             # print(f"Got the response from ImageStorage")
             __attachments = [{"id":0, "filename":response[1][0],"uploaded_filename":response[1][1]}]
             # print(f"Printing out  the attachments: {__attachments}")
-        __payload = self.get_payload(attachments=__attachments)
-        response = GetResponse(url=self.interaction_url, json = __payload, headers=self.headers)
-        time.sleep(10)
-        last_msg = self.get_last_message()
-        # pprint.pprint(last_msg)
-        descs = last_msg["embeds"][0]["description"].split("\n")
-        # cleaned_list = [element for element in descs if element]
-        cleaned_list = []
-        for item in descs:
-            if item:  # Check if the string is not empty
-                # Remove URLs using regular expression
-                # item = re.sub(r'\[.*?\]\(https?:\/\/.*?\)', '', item)
-                item = re.sub(r'\(https?:\/\/.*?\)', '', item)
-                item = re.sub(r'\[', '', item)
-                item = re.sub(r'\]', '', item)
-                cleaned_list.append(item.strip()[4::])
+            __payload = self.get_payload(attachments=__attachments)
+            response = GetResponse(url=self.interaction_url, json = __payload, headers=self.headers)
+            time.sleep(10)
+            last_msg = self.get_last_message()
+            descs = last_msg["embeds"][0]["description"].split("\n")
+            # cleaned_list = [element for element in descs if element]
+            cleaned_list = []
+            for item in descs:
+                if item:  # Check if the string is not empty
+                    # Remove URLs using regular expression
+                    # item = re.sub(r'\[.*?\]\(https?:\/\/.*?\)', '', item)
+                    item = re.sub(r'\(https?:\/\/.*?\)', '', item)
+                    item = re.sub(r'\[', '', item)
+                    item = re.sub(r'\]', '', item)
+                    cleaned_list.append(item.strip()[4::])
+        else:
+            return []
         # print(cleaned_list)
         return cleaned_list
         
 
-# midjourney_id = "936929561302675456"
-
-if __name__ == "__main__":
-    # a = ImagineService()
-    # imagine_json = a.get_payload(prompt="Will Smith")
-    # response = GetResponse(url=a.interaction_url, json=imagine_json, headers=a.headers)
-    # last_msg = a.get_option_from_generated(idx=0)
-    
-    a = DescribeService()
-    filename = os.path.join(os.getcwd(), "image_2.jpg")
-    descs = a.get_descriptions(filename)
 

@@ -2,7 +2,6 @@ import os
 import re
 import time
 import json
-import pprint
 import random
 import requests
 
@@ -27,12 +26,31 @@ class ImagineService(GlobalConfigs):
             headers=self.headers,
             data= {},
         ).text)
-        # pprint.pprint(self.updated_json)s
         self.midjourney_id = self.updated_json["application_commands"][0]["application_id"] # application_id that midjourney was given by Discord
         self.imagine_id = self.updated_json["application_commands"][0]["id"]
         self.version = self.updated_json["application_commands"][0]["version"]
     
-    def get_payload(self, prompt: str) -> dict:
+    def get_payload(self, prompt: str, realism: bool = True, close_up: bool = True) -> dict:
+        if realism:
+            aspect_ratio_pattern = r"--ar \d+:\d+"
+            aspect_ratio_match = re.search(aspect_ratio_pattern, prompt)
+
+            additional_text = "perceptive Fashion Photography, cinematic shots, cinematic color grading, ultra realistic, Phantom High-Speed Camera, 35mm, f1/8, global illumination, film, RAW,"
+
+            if close_up:
+                additional_text = f"close up shot, looking directly at the camera, {additional_text}"
+
+            # Extract and remove the aspect ratio substring
+            if aspect_ratio_match:
+                aspect_ratio = aspect_ratio_match.group(0)
+                text_without_ar = re.sub(aspect_ratio_pattern, '', prompt).strip()
+            else:
+                aspect_ratio = ""  # Default aspect ratio if none found
+                text_without_ar = prompt
+
+            # Append the additional descriptive text and the aspect ratio
+            prompt = f"{text_without_ar}, {additional_text} {aspect_ratio}"
+
         imagine_json = {
             "type": 2,
             "application_id": self.midjourney_id,
@@ -93,17 +111,16 @@ class ImagineService(GlobalConfigs):
                 data={},
             ).text
         )
-        # pprint.pprint(messages[0]["id"])
         return messages[0]
     
     def get_option_from_generated(self, idx: int) -> bool:
         # last_msg = self.get_last_message()
-        time.sleep(1)
+        time.sleep(10)
         try:
             while True:
                 last_msg = self.get_last_message()
                 if str(last_msg["content"]).endswith('%) (fast)') or str(last_msg["content"]).endswith('(Waiting to start)'):
-                    time.sleep(5)
+                    time.sleep(8)
                 else:
                     break;
         except Exception as e:
@@ -120,6 +137,7 @@ class ImagineService(GlobalConfigs):
                 "component_type": 2,
                 "custom_id": last_msg["components"][0]["components"][idx]["custom_id"]
             },}
+        print(f"Sending the upscaling of {idx} image")
         response = GetResponse(url=self.interaction_url,
                                json=generated_msg_payload,
                                headers=self.headers,)
@@ -129,7 +147,7 @@ class ImagineService(GlobalConfigs):
                 while True:
                     last_msg = self.get_last_message()
                     if str(last_msg["content"]).endswith('%) (fast)') or str(last_msg["content"]).endswith('(Waiting to start)'):
-                        time.sleep(5)
+                        time.sleep(8)
                     else:
                         break;
             except Exception as e:
