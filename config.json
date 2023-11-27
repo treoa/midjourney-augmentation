@@ -1,7 +1,7 @@
 {
-    "server_id": "your_server_id",
-    "discord_token": "your_discord_token",
-    "channel_id": "your_channel_id",
+    "server_id": "10716282991948759341",
+    "discord_token": "OTc5NDAzNTI4NjQ2ODQwMzIw.Gae6pZ.NrwHWCZpheDmg_SkvVOvwiuWw_HB_AyiF8Pkw01",
+    "channel_id": "10716282991948759371",
     "cookie": "'__cfruid=61abc7881b939246d72c5835162f298b0f406bcf-1698719546; __dcfduid=bb24565e779511ee84565ac1e2370008; __sdcfduid=bb24565e779511ee84565ac1e2370008125720b98f31796fc8b347145ddf986a2ca092084b53fe33174ea055f9dfaf82; _cfuvid=saJ3zrWbMHIsx5ISYIGH5Gu4AfWejCk2EkYJRL226Rg-1698719546871-0-604800000'",
     "base_url": "https://discord.com/api/v10/"
 }
