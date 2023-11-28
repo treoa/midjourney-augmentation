@@ -2,7 +2,7 @@
 
 ## Disclaimer
 
-Current Midjourney tool for now can send the “imagine” request, interact with the response from “imagine” request and send the “describe” request, getting the list of descriptions.
+Current Midjourney tool works primarily with face images and for now can send the “imagine” request, interact with the response from “imagine” request and send the “describe” request, getting the list of descriptions.
 
 ! To use current tool, active subscription to Midjourney is required
 
@@ -57,20 +57,19 @@ Note:
 
 ```python
 filename = "FULL_LINK_OR_PATH"
-descs = descrive_service.get_descriptions(file=filename)
+descriptions = describe_service.get_descriptions(file=filename)
 
-print(descs)
+print(descriptions)
 ```
 
 `get_descriptions` method returns the list of formatted descriptions that Midjourney gave
 
 ```python
-imagine_json = imagine_service.get_payload(prompt=descs[0], realism=True, close_up=True)
-response = GetResponse(url=b.interaction_url, json=imagine_json, headers=b.headers)
-last_msg = imagine_service.get_option_from_generated(idx=1)
+imagine_service.imagine(prompt=descriptions[0], realism=True, close_up=True)
+imagine_service.get_option_from_generated(idx=1, crop=True)
 ```
 
-Above we passed the first received before description to the imagine. You also can manually write your prompt string instead of `descs[0].`
+Above we passed the first received before descriptions to the imagine. You also can manually write your prompt string instead of `descriptions[0].`
 
 `realism` stands for adding an additional prompt for realistic images
 
@@ -78,4 +77,4 @@ Above we passed the first received before description to the imagine. You also c
 
 Then getting the response from imagine command, we instantiate the new request of selecting the upscaling of 2nd image as passing `idx=1` variable to the `get_option_from_generated()` method.
 
-Finally, we have a saved as `image_{highest_idx}.jpg` file of the generated formerly image locally, where script is running.
+Finally, we have a saved as `image_{highest_idx}.jpg` and `image_{highest_idx}_cropped.jpg` files of the generated formerly image locally, where script is running.

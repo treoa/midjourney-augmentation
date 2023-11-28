@@ -6,7 +6,7 @@ import random
 import requests
 
 from globals import GlobalConfigs
-from helpers import GetResponse
+from helpers import GetResponse, logme, crop_face
 
 class ImagineService(GlobalConfigs):
     def __init__(self, 
@@ -30,7 +30,7 @@ class ImagineService(GlobalConfigs):
         self.imagine_id = self.updated_json["application_commands"][0]["id"]
         self.version = self.updated_json["application_commands"][0]["version"]
     
-    def get_payload(self, prompt: str, realism: bool = True, close_up: bool = True) -> dict:
+    def generate_payload(self, prompt: str, realism: bool = True, close_up: bool = True) -> None:
         if realism:
             aspect_ratio_pattern = r"--ar \d+:\d+"
             aspect_ratio_match = re.search(aspect_ratio_pattern, prompt)
@@ -51,7 +51,7 @@ class ImagineService(GlobalConfigs):
             # Append the additional descriptive text and the aspect ratio
             prompt = f"{text_without_ar}, {additional_text} {aspect_ratio}"
 
-        imagine_json = {
+        self.imagine_json = {
             "type": 2,
             "application_id": self.midjourney_id,
             "guild_id": self.server_id,
@@ -99,8 +99,6 @@ class ImagineService(GlobalConfigs):
                 "attachments": [],
             }
         }
-
-        return imagine_json
     
     def get_last_message(self) -> dict:
         messages = json.loads(
@@ -113,7 +111,32 @@ class ImagineService(GlobalConfigs):
         )
         return messages[0]
     
-    def get_option_from_generated(self, idx: int) -> bool:
+    def imagine(self, prompt:str, realism: bool = True, close_up: bool = True) -> bool:
+        try:
+            self.generate_payload(prompt=prompt, realism=realism, close_up=close_up)
+            self.imagine_response = GetResponse(url=self.interaction_url, json=self.imagine_json, headers=self.headers)
+            if self.imagine_response[0]:
+                return True
+            else:
+                logme("Something went wrong in imagine function")
+        except Exception as e:
+            logme(e)
+            
+    def get_highest_index(self) -> int:
+        files = os.listdir('.')
+        return max((int(match.group(1)) for file in files if (match := re.match(r'image_(\d+)\.jpg', file))), default=0)
+    
+    def get_option_from_generated(self, idx: int, crop: bool=True) -> bool:
+        """
+        Send an option for upscale from the generated image.
+
+        Args:
+            idx (int): The index of the image option.
+            crop (bool): Whether to crop the face or not
+
+        Returns:
+            bool: True if the option was successfully retrieved and saved as an image file, False otherwise.
+        """
         # last_msg = self.get_last_message()
         time.sleep(10)
         try:
@@ -122,9 +145,10 @@ class ImagineService(GlobalConfigs):
                 if str(last_msg["content"]).endswith('%) (fast)') or str(last_msg["content"]).endswith('(Waiting to start)'):
                     time.sleep(8)
                 else:
+                    # logme(f"The last message got is: {last_msg['content']}")
                     break;
         except Exception as e:
-            print(f"Failed to check for messages. Error message: {e}")
+            logme(f"Failed to check for messages. Error message: {e}")
             return False
         generated_msg_payload = {
             "type": 3,
@@ -137,7 +161,7 @@ class ImagineService(GlobalConfigs):
                 "component_type": 2,
                 "custom_id": last_msg["components"][0]["components"][idx]["custom_id"]
             },}
-        print(f"Sending the upscaling of {idx} image")
+        logme(f"Sending the upscaling of {idx} image")
         response = GetResponse(url=self.interaction_url,
                                json=generated_msg_payload,
                                headers=self.headers,)
@@ -147,39 +171,35 @@ class ImagineService(GlobalConfigs):
                 while True:
                     last_msg = self.get_last_message()
                     if str(last_msg["content"]).endswith('%) (fast)') or str(last_msg["content"]).endswith('(Waiting to start)'):
-                        time.sleep(8)
+                        time.sleep(10)
                     else:
                         break;
             except Exception as e:
-                print(f"Failed to check for messages. Error message: {e}")
+                logme(f"Failed to check for messages. Error message: {e}")
                 return False
-            attachment_url = last_msg["attachments"][0]["url"]
             try:
+                attachment_url = last_msg["attachments"][0]["url"]
                 image_response = requests.get(attachment_url)
-                # List all files in the current directory
-                files = os.listdir('.')
-
-                # Find the highest index used so far in image_{number}.jpg
-                highest_idx = 0
-                for file in files:
-                    match = re.match(r'image_(\d+)\.jpg', file)
-                    if match:
-                        idx = int(match.group(1))
-                        highest_idx = max(highest_idx, idx)
+            except Exception as e:
+                logme(f"Failed to acquire the image url. {e}")
+                return False
+            try:
+                highest_idx = self.get_highest_index()
 
                 # Increment the index for the new image
                 new_idx = highest_idx + 1
                 filename = f'image_{new_idx}.jpg'
-                if image_response.status_code == 200:
-                    with open(filename, 'wb') as file:
-                        file.write(image_response.content)
-                    print(f"File saved as {filename}")
-                else:
-                    raise Exception
+                if not image_response.status_code == 200:
+                    raise Exception("Error occurred")
+                with open(filename, 'wb') as file:
+                    file.write(image_response.content)
+                logme(f"File saved as {filename}")
+                if crop:
+                    crop_face(filename)
             except Exception as e:
-                print("Something went wrong. The erorr is {e}")
+                logme(f"Something went wrong during file saving. The error is {e}")
                 return False
             return True
         else:
-            print("Something went wrong. See the error above.")
+            logme("Something went wrong. See the error above.")
             return False

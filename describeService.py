@@ -9,8 +9,7 @@ import requests
 from typing import List
 
 from globals import GlobalConfigs
-from helpers import GetResponse, _ResponseCheck
-from imagineService import ImagineService
+from helpers import GetResponse, _ResponseCheck, logme, crop_face
 
 class DescribeService(GlobalConfigs):
     def __init__(self, 
@@ -23,24 +22,30 @@ class DescribeService(GlobalConfigs):
                  interaction_url: str = None,
                  describe_url: str = None) -> None:
         super().__init__(server_id, discord_token, channel_id, cookie, storage_url, messages_url, interaction_url)
-        self.describe_url = describe_url if describe_url else f"https://discord.com/api/v10/channels/{self.channel_id}/application-commands/search?type=1&include_applications=true&query=describe"
-        self.updated_json = json.loads(requests.request(
-            "GET",
-            self.describe_url,
-            headers=self.headers,
-            data= {},
-        ).text)
-        self.midjourney_id = self.updated_json["application_commands"][0]["application_id"] # application_id that midjourney was given by Discord
-        self.describe_id = self.updated_json["application_commands"][0]["id"]
-        self.version = self.updated_json["application_commands"][0]["version"]
-        self.describe_json = {
-            "session_id": random.randint(0, 8888),
-            "version": self.version,
-            "id": self.midjourney_id,
-        }
+        self.describe_url = describe_url or f"https://discord.com/api/v10/channels/{self.channel_id}/application-commands/search?type=1&include_applications=true&query=describe"
+        try:
+            self.updated_json = json.loads(requests.request(
+                "GET",
+                self.describe_url,
+                headers=self.headers,
+                data= {},
+            ).text)
+            self.midjourney_id = self.updated_json["application_commands"][0]["application_id"] # application_id that midjourney was given by Discord
+            self.describe_id = self.updated_json["application_commands"][0]["id"]
+            self.version = self.updated_json["application_commands"][0]["version"]
+            self.describe_json = {
+                "session_id": random.randint(0, 8888),
+                "version": self.version,
+                "id": self.midjourney_id,
+            }
+            # for attr in dir(self):
+            #     if not attr.startswith("__"):
+            #         print(f"{attr} : {getattr(self, attr)}\n")
+        except Exception as e:
+            logme(f"Error occurred. \n{e}")
 
     def get_payload(self, attachments: list) -> dict:
-        __payload = {
+        return {
             "type":2,
             "application_id":self.midjourney_id,
             "guild_id": self.server_id,
@@ -60,7 +65,6 @@ class DescribeService(GlobalConfigs):
                 },"attachments":attachments,
             }
         }
-        return __payload
     
     def get_last_message(self) -> dict:
         messages = json.loads(
@@ -74,48 +78,41 @@ class DescribeService(GlobalConfigs):
         return messages[0]
     
     def JsonRegImg(self, filename : str, filesize : int) -> dict:
-        __payload = {"files": [{"filename": filename, "file_size": filesize, "id": 0}]}
-        return __payload
+        return {"files": [{"filename": filename, "file_size": filesize, "id": 0}]}
     
     def ImageStorage(self, ImageName : str, ImageUrl : str, ImageSize : int) -> tuple:
         try:
             ImageName = ImageName.split(".")
-            ImageName = "{}_{}".format(ImageName[0], ImageName[1])
-
-            _response = requests.post(url = self.storage_url, json = self.JsonRegImg(ImageName, ImageSize), headers = self.headers)
-            if _ResponseCheck(_response)[0]:
-                __Res = _response.json()["attachments"][0]
-                upload_url = __Res["upload_url"]
-                upload_filename = __Res["upload_filename"]
-
-                __response = requests.get(ImageUrl, headers={"authority":"cdn.discordapp.com"})
-                if _ResponseCheck(__response)[0]:
-                    if ImageUrl != "https://example.com":
-                        my_data = __response.content
-                    else:
-                        my_data = open(ImageName, "rb")
-                    # ___response = requests.put(upload_url,data=__response.content, headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
-                    ___response = requests.put(upload_url, data=my_data, headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
-                    if _ResponseCheck(___response)[0]:
-                        return (True, (ImageName, upload_filename))
-                    else:
-                        return (False, "StorageError in Location:ImageStorage, Msg:Can't Storage!")
-                else:
-                    return (False, "ReadError in Location:Image, Msg:Image is not exist!")
-            else:
+            ImageName = f"{ImageName[0]}.{ImageName[1]}"
+            _response = GetResponse(url=self.storage_url, json=self.JsonRegImg(ImageName, ImageSize), headers=self.headers)
+            if not _response[0]:
                 return (False, "ResponseError in Location:GetResponse, Msg:Fail to get Response from Discord!")
+            __Res = _response[1].json()["attachments"][0]
+            upload_url = __Res["upload_url"]
+            upload_filename = __Res["upload_filename"]
+
+            __response = requests.get(ImageUrl, headers={"authority":"cdn.discordapp.com"})
+            if not _ResponseCheck(__response)[0]:
+                return (False, "ReadError in Location:Image, Msg:Image is not exist!")
+            my_data = __response.content if ImageUrl != "https://example.com" else open(ImageName, "rb")
+
+            ___response = requests.put(upload_url, data=my_data, headers={"authority":"discord-attachments-uploads-prd.storage.googleapis.com"})
+            if not _ResponseCheck(___response)[0]:
+                return (False, "StorageError in Location:ImageStorage, Msg:Can't Storage!")
+            return (True, (ImageName, upload_filename))
         except Exception as e:
-            return (False, "RunningError in Location:{}, Msg:{}".format("ImageStorage", e))
+            return (False, f"RunningError in Location:ImageStorage, Msg:{e}")
     
     def get_descriptions(self, file: str) -> List[str]:
         image_url = file
         if not file.startswith('http'):
             image_url = "https://example.com"
+            crop_face(file)
+            file_name, file_extension = os.path.splitext(file)
+            file = f"{file_name}_cropped{file_extension}"
         response = self.ImageStorage(ImageName=file, ImageUrl=image_url, ImageSize = random.randint(4444, 8888))
         if response[0]:
-            # print(f"Got the response from ImageStorage")
             __attachments = [{"id":0, "filename":response[1][0],"uploaded_filename":response[1][1]}]
-            # print(f"Printing out  the attachments: {__attachments}")
             __payload = self.get_payload(attachments=__attachments)
             response = GetResponse(url=self.interaction_url, json = __payload, headers=self.headers)
             time.sleep(10)
@@ -132,8 +129,8 @@ class DescribeService(GlobalConfigs):
                     item = re.sub(r'\]', '', item)
                     cleaned_list.append(item.strip()[4::])
         else:
+            logme(f"Something went wrong at getting descriptions with response: {response[1]}")
             return []
-        # print(cleaned_list)
         return cleaned_list
         
 
