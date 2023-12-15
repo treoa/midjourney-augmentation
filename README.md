@@ -57,7 +57,7 @@ Note:
 
 ```python
 filename = "FULL_LINK_OR_PATH"
-descriptions = describe_service.get_descriptions(file=filename)
+descriptions = describe_service.get_descriptions(file=filename, crop=True)
 
 print(descriptions)
 ```
@@ -65,8 +65,9 @@ print(descriptions)
 `get_descriptions` method returns the list of formatted descriptions that Midjourney gave
 
 ```python
-imagine_service.imagine(prompt=descriptions[0], realism=True, close_up=True)
-imagine_service.get_option_from_generated(idx=1, crop=True)
+chosen_description = descriptions[0]
+imagine_service.imagine(prompt=chosen_description, realism=True, close_up=True)
+imagine_service.get_option_from_generated(idx=1, crop=True, prompt=chosen_description)
 ```
 
 Above we passed the first received before descriptions to the imagine. You also can manually write your prompt string instead of `descriptions[0].`

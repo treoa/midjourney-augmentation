@@ -42,7 +42,7 @@ class DescribeService(GlobalConfigs):
             #     if not attr.startswith("__"):
             #         print(f"{attr} : {getattr(self, attr)}\n")
         except Exception as e:
-            logme(f"Error occurred. \n{e}")
+            logme(f"Error occurred. \n{e}", level="error")
 
     def get_payload(self, attachments: list) -> dict:
         return {
@@ -103,21 +103,34 @@ class DescribeService(GlobalConfigs):
         except Exception as e:
             return (False, f"RunningError in Location:ImageStorage, Msg:{e}")
     
-    def get_descriptions(self, file: str) -> List[str]:
-        image_url = file
-        if not file.startswith('http'):
-            image_url = "https://example.com"
-            crop_face(file)
-            file_name, file_extension = os.path.splitext(file)
-            file = f"{file_name}_cropped{file_extension}"
-        response = self.ImageStorage(ImageName=file, ImageUrl=image_url, ImageSize = random.randint(4444, 8888))
-        if response[0]:
+    def get_descriptions(self, file: str,crop=True) -> List[str]:
+        try:
+            image_url = file
+            if not file.startswith('http'):
+                image_url = "https://example.com"
+                if crop:
+                    # crop_face(file)
+                    # file_name, file_extension = os.path.splitext(file)
+                    # file = f"{file_name}_cropped{file_extension}"
+                    pass
+            response = self.ImageStorage(ImageName=file, ImageUrl=image_url, ImageSize = random.randint(4444, 8888))
+        except Exception as e:
+            logme(f"Error during the image storage {e}", level="error")
+            return []
+        if not response[0]:
+            logme(f"Something went wrong at getting descriptions with response: {response[1]}", level="error")
+            return []
+        try:
             __attachments = [{"id":0, "filename":response[1][0],"uploaded_filename":response[1][1]}]
             __payload = self.get_payload(attachments=__attachments)
             response = GetResponse(url=self.interaction_url, json = __payload, headers=self.headers)
             time.sleep(10)
             last_msg = self.get_last_message()
             descs = last_msg["embeds"][0]["description"].split("\n")
+        except Exception as e:
+            logme(f"Got error while extracting descriptions. {e}", level="error")
+            return []
+        try:
             # cleaned_list = [element for element in descs if element]
             cleaned_list = []
             for item in descs:
@@ -128,9 +141,17 @@ class DescribeService(GlobalConfigs):
                     item = re.sub(r'\[', '', item)
                     item = re.sub(r'\]', '', item)
                     cleaned_list.append(item.strip()[4::])
-        else:
-            logme(f"Something went wrong at getting descriptions with response: {response[1]}")
+            # save descriptions in a separate txt document
+            filename_without_extension = os.path.splitext(file)[0]
+        except Exception as e:
+            logme(f"Error while generating the cleaned list. {e}", level="error")
             return []
+        try:
+            with open(f"{filename_without_extension}.txt", "w") as file:
+                for description in cleaned_list:
+                    file.write(description + "\n")
+        except Exception as e:
+            logme(f"Something went wrong during txt file writing. {e}", level="error")
         return cleaned_list
         
 
